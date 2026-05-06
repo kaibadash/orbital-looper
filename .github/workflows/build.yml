@@ -27,6 +27,11 @@ jobs:
       - name: Build
         run: cmake --build build --config Release
 
+      - name: Codesign (ad-hoc)
+        run: |
+          find build -name "*.component" -type d -exec codesign --force --deep --sign - {} \;
+          find build -name "*.vst3" -type d -exec codesign --force --deep --sign - {} \;
+
       - name: Package
         run: |
           mkdir -p staging
