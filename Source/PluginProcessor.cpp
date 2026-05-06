@@ -33,6 +33,7 @@ OrbitalLooperAudioProcessor::OrbitalLooperAudioProcessor()
 {
     // Create initial loop engine (prepared in prepareToPlay)
     loopEngines.push_back(std::make_unique<LoopEngine>());
+    resetShortcutsToDefaults();
     loadGlobalDefaults();   // v05.00 — apply before DAW restores project state
 }
 
@@ -798,6 +799,14 @@ void OrbitalLooperAudioProcessor::getStateInformation(juce::MemoryBlock& destDat
     // v07.00 — dark mode
     obj->setProperty("darkMode", darkMode);
 
+    // Keyboard shortcuts
+    {
+        auto* shObj = new juce::DynamicObject();
+        for (int i = 0; i < SC_COUNT; ++i)
+            shObj->setProperty("k" + juce::String(i), shortcuts[i].getTextDescription());
+        obj->setProperty("shortcuts", juce::var(shObj));
+    }
+
     juce::String json = juce::JSON::toString(state);
     destData.replaceAll(json.toRawUTF8(), json.getNumBytesAsUTF8());
 }
@@ -936,6 +945,22 @@ void OrbitalLooperAudioProcessor::setStateInformation(const void* data, int size
     // v07.00 — dark mode
     if (state.hasProperty("darkMode"))
         darkMode = static_cast<bool>(state["darkMode"]);
+
+    // Keyboard shortcuts
+    if (state.hasProperty("shortcuts"))
+    {
+        auto& s = state["shortcuts"];
+        for (int i = 0; i < SC_COUNT; ++i)
+        {
+            juce::Identifier key ("k" + juce::String(i));
+            if (s.hasProperty(key))
+            {
+                juce::String desc = s[key].toString();
+                shortcuts[i] = desc.isEmpty() ? juce::KeyPress()
+                                              : juce::KeyPress::createFromDescription(desc);
+            }
+        }
+    }
 
     if (state.hasProperty("sessionFile"))
         currentSessionFile = juce::File(state["sessionFile"].toString());
@@ -1334,6 +1359,13 @@ void OrbitalLooperAudioProcessor::saveGlobalDefaults()
     obj->setProperty("syncMode",        (int)globalSyncMode);
     obj->setProperty("darkMode",        darkMode);
 
+    {
+        auto* shObj = new juce::DynamicObject();
+        for (int i = 0; i < SC_COUNT; ++i)
+            shObj->setProperty("k" + juce::String(i), shortcuts[i].getTextDescription());
+        obj->setProperty("shortcuts", juce::var(shObj));
+    }
+
     auto dest = getGlobalDefaultsFile();
     dest.getParentDirectory().createDirectory();
     dest.replaceWithText(juce::JSON::toString(state));
@@ -1408,6 +1440,21 @@ void OrbitalLooperAudioProcessor::loadGlobalDefaults()
         globalSyncMode = static_cast<LoopSyncMode>(static_cast<int>(state["syncMode"]));
     if (state.hasProperty("darkMode"))
         darkMode = static_cast<bool>(state["darkMode"]);
+
+    if (state.hasProperty("shortcuts"))
+    {
+        auto& s = state["shortcuts"];
+        for (int i = 0; i < SC_COUNT; ++i)
+        {
+            juce::Identifier key ("k" + juce::String(i));
+            if (s.hasProperty(key))
+            {
+                juce::String desc = s[key].toString();
+                shortcuts[i] = desc.isEmpty() ? juce::KeyPress()
+                                              : juce::KeyPress::createFromDescription(desc);
+            }
+        }
+    }
 }
 
 bool OrbitalLooperAudioProcessor::hasGlobalDefaults() const
@@ -1432,6 +1479,69 @@ void OrbitalLooperAudioProcessor::cancelMidiLearn()
 int OrbitalLooperAudioProcessor::pollMidiLearnResult()
 {
     return midiLearnResult.exchange(-1);
+}
+
+//==============================================================================
+// KEYBOARD SHORTCUTS
+//==============================================================================
+const char* OrbitalLooperAudioProcessor::getShortcutName(int id)
+{
+    switch (id)
+    {
+        case SC_THEME:       return "Theme (Light/Dark)";
+        case SC_SAVE:        return "Save";
+        case SC_LOAD:        return "Load";
+        case SC_SETTINGS:    return "Settings";
+        case SC_RECORD:      return "Record / Overdub";
+        case SC_MULTIPLY:    return "Multiply";
+        case SC_PLAY:        return "Play / Pause";
+        case SC_RESTART:     return "Restart";
+        case SC_UNDO:        return "Undo";
+        case SC_REDO:        return "Redo";
+        case SC_CLEAR:       return "Clear";
+        case SC_LOOP_UP:     return "Loop Up";
+        case SC_LOOP_DOWN:   return "Loop Down";
+        case SC_LOOP_ALL:    return "Loop All";
+        case SC_COUNT_IN:    return "Count In";
+        case SC_CLICK_TRACK: return "Click Track";
+        case SC_METRONOME:   return "Metronome On/Off";
+        case SC_TAP:         return "Tap Tempo";
+        case SC_ADD_LOOP:    return "Add Loop";
+        default:             return "";
+    }
+}
+
+juce::KeyPress OrbitalLooperAudioProcessor::getDefaultShortcut(int id)
+{
+    using K = juce::KeyPress;
+    const int mods = juce::ModifierKeys::commandModifier
+                   | juce::ModifierKeys::shiftModifier;
+
+    // Cmd+Shift+1..9 for the first 9 entries, Cmd+Shift+0 for the 10th.
+    // Remaining entries are unset by default — users can assign them manually.
+    if (id >= 0 && id < 9)
+        return K('1' + id, mods, 0);
+    if (id == 9)
+        return K('0', mods, 0);
+    return K();
+}
+
+juce::KeyPress OrbitalLooperAudioProcessor::getShortcut(int id) const
+{
+    if (id < 0 || id >= SC_COUNT) return juce::KeyPress();
+    return shortcuts[id];
+}
+
+void OrbitalLooperAudioProcessor::setShortcut(int id, const juce::KeyPress& kp)
+{
+    if (id < 0 || id >= SC_COUNT) return;
+    shortcuts[id] = kp;
+}
+
+void OrbitalLooperAudioProcessor::resetShortcutsToDefaults()
+{
+    for (int i = 0; i < SC_COUNT; ++i)
+        shortcuts[i] = getDefaultShortcut(i);
 }
 
 //==============================================================================

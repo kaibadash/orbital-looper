@@ -113,6 +113,8 @@ static bool isCCTypeByDefault(int index)
 SettingsComponent::SettingsComponent(OrbitalLooperAudioProcessor& processor)
     : audioProcessor(processor)
 {
+    setWantsKeyboardFocus(true);   // needed for shortcut capture
+
     const auto panelColour  = OrbitalLooperLookAndFeel::getPanelColour();
     const auto textColour   = OrbitalLooperLookAndFeel::getTextColour();
     const auto borderColour = OrbitalLooperLookAndFeel::getBorderColour();
@@ -664,6 +666,85 @@ SettingsComponent::SettingsComponent(OrbitalLooperAudioProcessor& processor)
     addAndMakeVisible(unlimitedLayersButton);
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // SHORTCUTS section (collapsible)
+    // ═══════════════════════════════════════════════════════════════════════════
+    shortcutsSectionHeader.setText("", juce::dontSendNotification);
+    shortcutsSectionHeader.setInterceptsMouseClicks(false, false);
+    addAndMakeVisible(shortcutsSectionHeader);
+
+    for (int i = 0; i < OrbitalLooperAudioProcessor::SC_COUNT; ++i)
+    {
+        auto* nameLabel = shortcutNameLabels.add(new juce::Label());
+        nameLabel->setText(OrbitalLooperAudioProcessor::getShortcutName(i),
+                           juce::dontSendNotification);
+        nameLabel->setFont(OrbitalLooperLookAndFeel::getSanFranciscoFont(11.0f));
+        nameLabel->setColour(juce::Label::textColourId, textColour);
+        nameLabel->setJustificationType(juce::Justification::centredLeft);
+        addAndMakeVisible(nameLabel);
+
+        auto* keyLabel = shortcutKeyLabels.add(new juce::Label());
+        keyLabel->setJustificationType(juce::Justification::centred);
+        keyLabel->setFont(OrbitalLooperLookAndFeel::getSanFranciscoFont(11.0f));
+        keyLabel->setColour(juce::Label::textColourId,       textColour);
+        keyLabel->setColour(juce::Label::backgroundColourId, panelColour);
+        keyLabel->setColour(juce::Label::outlineColourId,    borderColour);
+        addAndMakeVisible(keyLabel);
+
+        auto* setBtn = shortcutSetButtons.add(new juce::TextButton("Set"));
+        setBtn->setColour(juce::TextButton::buttonColourId,  panelColour);
+        setBtn->setColour(juce::TextButton::textColourOffId, textColour);
+        setBtn->setColour(juce::TextButton::textColourOnId,  textColour);
+        setBtn->onClick = [this, i]
+        {
+            if (shortcutLearningIndex == i)
+            {
+                cancelShortcutLearn();
+            }
+            else
+            {
+                cancelShortcutLearn();
+                shortcutLearningIndex = i;
+                shortcutSetButtons[i]->setButtonText("Press a key");
+                shortcutSetButtons[i]->setColour(juce::TextButton::buttonColourId,
+                                                  juce::Colour(0xffef4444));
+                shortcutSetButtons[i]->repaint();
+                grabKeyboardFocus();
+            }
+        };
+        addAndMakeVisible(setBtn);
+
+        auto* clearBtn = shortcutClearButtons.add(new juce::TextButton("Clear"));
+        clearBtn->setColour(juce::TextButton::buttonColourId,  panelColour);
+        clearBtn->setColour(juce::TextButton::textColourOffId, textColour);
+        clearBtn->setColour(juce::TextButton::textColourOnId,  textColour);
+        clearBtn->onClick = [this, i]
+        {
+            cancelShortcutLearn();
+            audioProcessor.setShortcut(i, juce::KeyPress());
+            updateShortcutKeyLabel(i);
+        };
+        addAndMakeVisible(clearBtn);
+
+        updateShortcutKeyLabel(i);
+    }
+
+    resetShortcutsButton.setButtonText("Reset Shortcuts");
+    resetShortcutsButton.setColour(juce::TextButton::buttonColourId,  panelColour);
+    resetShortcutsButton.setColour(juce::TextButton::textColourOffId, textColour);
+    resetShortcutsButton.setColour(juce::TextButton::textColourOnId,  textColour);
+    resetShortcutsButton.onClick = [this]
+    {
+        cancelShortcutLearn();
+        audioProcessor.resetShortcutsToDefaults();
+        for (int i = 0; i < OrbitalLooperAudioProcessor::SC_COUNT; ++i)
+            updateShortcutKeyLabel(i);
+    };
+    addAndMakeVisible(resetShortcutsButton);
+
+    // Shortcut rows start hidden (collapsed)
+    setShortcutRowsVisible(false);
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // GLOBAL DEFAULTS section
     // ═══════════════════════════════════════════════════════════════════════════
     globalSectionHeader.setText("GLOBAL DEFAULTS", juce::dontSendNotification);
@@ -794,6 +875,12 @@ SettingsComponent::SettingsComponent(OrbitalLooperAudioProcessor& processor)
         // Apply MIDI defaults
         auto& mapping = audioProcessor.getMidiMapping();
         mapping = defaultMapping;
+
+        // Reset shortcuts
+        cancelShortcutLearn();
+        audioProcessor.resetShortcutsToDefaults();
+        for (int i = 0; i < OrbitalLooperAudioProcessor::SC_COUNT; ++i)
+            updateShortcutKeyLabel(i);
     };
     addAndMakeVisible(resetToDefaultsButton);
 
@@ -818,6 +905,7 @@ SettingsComponent::~SettingsComponent()
     stopTimer();
     if (learningIndex >= 0)
         audioProcessor.cancelMidiLearn();
+    shortcutLearningIndex = -1;
 }
 
 // ─── timer (MIDI learn polling) ───────────────────────────────────────────────
@@ -858,12 +946,41 @@ void SettingsComponent::mouseDown(const juce::MouseEvent& e)
         isMidiExpanded = !isMidiExpanded;
         setMidiRowsVisible(isMidiExpanded);
 
-        int newHeight = isMidiExpanded ? computeExpandedHeight() : 836;
-        resizeParentWindow(newHeight);
-
+        resizeParentWindow(computeExpandedHeight());
         resized();
         repaint();
+        return;
     }
+
+    if (shortcutsSectionHeader.getBounds().contains(e.position.toInt()))
+    {
+        cancelShortcutLearn();
+        isShortcutsExpanded = !isShortcutsExpanded;
+        setShortcutRowsVisible(isShortcutsExpanded);
+
+        resizeParentWindow(computeExpandedHeight());
+        resized();
+        repaint();
+        return;
+    }
+}
+
+bool SettingsComponent::keyPressed(const juce::KeyPress& key)
+{
+    if (shortcutLearningIndex < 0)
+        return false;
+
+    // Escape cancels capture without changing the binding
+    if (key == juce::KeyPress(juce::KeyPress::escapeKey))
+    {
+        cancelShortcutLearn();
+        return true;
+    }
+
+    audioProcessor.setShortcut(shortcutLearningIndex, key);
+    updateShortcutKeyLabel(shortcutLearningIndex);
+    cancelShortcutLearn();
+    return true;
 }
 
 // ─── paint ────────────────────────────────────────────────────────────────────
@@ -955,6 +1072,43 @@ void SettingsComponent::paint(juce::Graphics& g)
         g.drawText(isMidiExpanded ? "\u25BC" : "\u25B6",
                    midiBarBounds.getRight() - 24, midiBarBounds.getY(),
                    20, midiBarBounds.getHeight(), juce::Justification::centred);
+    }
+
+    // SHORTCUTS header bar (custom-painted)
+    {
+        auto barBounds = shortcutsSectionHeader.getBounds();
+        g.setColour(containerColour);
+        g.fillRoundedRectangle(barBounds.toFloat(), 4.0f);
+
+        g.setColour(textColour);
+        g.setFont(OrbitalLooperLookAndFeel::getSanFranciscoFont(14.0f).withStyle(juce::Font::bold));
+        g.drawText("SHORTCUTS", barBounds.getX() + 12, barBounds.getY(),
+                   140, barBounds.getHeight(), juce::Justification::centredLeft);
+
+        g.setFont(OrbitalLooperLookAndFeel::getSanFranciscoFont(14.0f));
+        g.drawText(isShortcutsExpanded ? "\u25BC" : "\u25B6",
+                   barBounds.getRight() - 24, barBounds.getY(),
+                   20, barBounds.getHeight(), juce::Justification::centred);
+    }
+
+    // SHORTCUTS column descriptions (when expanded)
+    if (isShortcutsExpanded && shortcutNameLabels.size() > 0)
+    {
+        int firstRowY = shortcutNameLabels[0]->getBounds().getY();
+        int descY = firstRowY - 18;
+
+        int keyX  = shortcutKeyLabels[0]->getBounds().getX();
+        int keyW  = shortcutKeyLabels[0]->getBounds().getWidth();
+        int setX  = shortcutSetButtons[0]->getBounds().getX();
+        int setW  = shortcutSetButtons[0]->getBounds().getWidth();
+        int clrX  = shortcutClearButtons[0]->getBounds().getX();
+        int clrW  = shortcutClearButtons[0]->getBounds().getWidth();
+
+        g.setFont(OrbitalLooperLookAndFeel::getSanFranciscoFont(10.0f));
+        g.setColour(textColour);
+        g.drawText("Key",   keyX, descY, keyW, 16, juce::Justification::centred);
+        g.drawText("Set",   setX, descY, setW, 16, juce::Justification::centred);
+        g.drawText("Clear", clrX, descY, clrW, 16, juce::Justification::centred);
     }
 
     // ── MIDI sub-group headers + column descriptions (when expanded) ─────────
@@ -1196,6 +1350,38 @@ void SettingsComponent::resized()
     bounds.removeFromTop(16);
 
     // ═════════════════════════════════════════════════════════════════════════
+    // SHORTCUTS (collapsible header + rows)
+    // ═════════════════════════════════════════════════════════════════════════
+    shortcutsSectionHeader.setBounds(bounds.removeFromTop(30));
+
+    if (isShortcutsExpanded)
+    {
+        bounds.removeFromTop(6);
+        bounds.removeFromTop(18);  // column descriptions
+
+        for (int i = 0; i < OrbitalLooperAudioProcessor::SC_COUNT; ++i)
+        {
+            auto row = bounds.removeFromTop(26);
+            shortcutNameLabels[i]->setBounds(row.removeFromLeft(160));
+            row.removeFromLeft(4);
+            shortcutKeyLabels[i]->setBounds(row.removeFromLeft(140));
+            row.removeFromLeft(4);
+            shortcutSetButtons[i]->setBounds(row.removeFromLeft(70));
+            row.removeFromLeft(4);
+            shortcutClearButtons[i]->setBounds(row.removeFromLeft(60));
+        }
+
+        bounds.removeFromTop(8);
+        {
+            auto row = bounds.removeFromTop(28);
+            resetShortcutsButton.setBounds(row.removeFromLeft(140));
+        }
+        bounds.removeFromTop(10);
+    }
+
+    bounds.removeFromTop(10);
+
+    // ═════════════════════════════════════════════════════════════════════════
     // GLOBAL DEFAULTS
     // ═════════════════════════════════════════════════════════════════════════
     globalSectionHeader.setBounds(bounds.removeFromTop(20));
@@ -1334,6 +1520,24 @@ void SettingsComponent::refreshThemeColours()
             learnButtons[i]->setColour(juce::TextButton::buttonColourId, pc);
     }
 
+    // Shortcut rows
+    for (int i = 0; i < OrbitalLooperAudioProcessor::SC_COUNT; ++i)
+    {
+        shortcutNameLabels[i]->setColour(juce::Label::textColourId, tc);
+        shortcutKeyLabels[i]->setColour(juce::Label::textColourId, tc);
+        shortcutKeyLabels[i]->setColour(juce::Label::backgroundColourId, pc);
+        shortcutKeyLabels[i]->setColour(juce::Label::outlineColourId, bc);
+        shortcutSetButtons[i]->setColour(juce::TextButton::textColourOffId, tc);
+        shortcutSetButtons[i]->setColour(juce::TextButton::textColourOnId, tc);
+        if (shortcutLearningIndex != i)
+            shortcutSetButtons[i]->setColour(juce::TextButton::buttonColourId, pc);
+        shortcutClearButtons[i]->setColour(juce::TextButton::textColourOffId, tc);
+        shortcutClearButtons[i]->setColour(juce::TextButton::textColourOnId, tc);
+        shortcutClearButtons[i]->setColour(juce::TextButton::buttonColourId, pc);
+    }
+    resetShortcutsButton.setColour(juce::TextButton::buttonColourId, pc);
+    resetShortcutsButton.setColour(juce::TextButton::textColourOffId, tc);
+
     // Re-apply toggle button highlight colours
     updateSetupButtons();
     updateMetronomeButton();
@@ -1468,6 +1672,42 @@ void SettingsComponent::setMidiRowsVisible(bool visible)
     }
 }
 
+void SettingsComponent::setShortcutRowsVisible(bool visible)
+{
+    for (int i = 0; i < OrbitalLooperAudioProcessor::SC_COUNT; ++i)
+    {
+        shortcutNameLabels[i]->setVisible(visible);
+        shortcutKeyLabels[i]->setVisible(visible);
+        shortcutSetButtons[i]->setVisible(visible);
+        shortcutClearButtons[i]->setVisible(visible);
+    }
+    resetShortcutsButton.setVisible(visible);
+}
+
+void SettingsComponent::cancelShortcutLearn()
+{
+    if (shortcutLearningIndex >= 0
+        && shortcutLearningIndex < shortcutSetButtons.size())
+    {
+        shortcutSetButtons[shortcutLearningIndex]->setButtonText("Set");
+        shortcutSetButtons[shortcutLearningIndex]->setColour(
+            juce::TextButton::buttonColourId,
+            OrbitalLooperLookAndFeel::getPanelColour());
+        shortcutSetButtons[shortcutLearningIndex]->repaint();
+    }
+    shortcutLearningIndex = -1;
+}
+
+void SettingsComponent::updateShortcutKeyLabel(int i)
+{
+    if (i < 0 || i >= shortcutKeyLabels.size()) return;
+
+    auto kp = audioProcessor.getShortcut(i);
+    juce::String text = kp.isValid() ? kp.getTextDescriptionWithIcons()
+                                     : juce::String(juce::CharPointer_UTF8("\xe2\x80\x94"));
+    shortcutKeyLabels[i]->setText(text, juce::dontSendNotification);
+}
+
 void SettingsComponent::resizeParentWindow(int newHeight)
 {
     if (auto* viewport = getParentComponent())
@@ -1484,15 +1724,19 @@ int SettingsComponent::computeExpandedHeight() const
 {
     int h = 836;   // collapsed baseline (760 + 76 for THEME section)
 
-    // MIDI expanded content:
-    //   22 data rows     x 26 px = 572
-    //    5 sub-headers   x 20 px = 100
-    //    5 col-desc rows x 18 px =  90
-    //    top gap after header    =   6
-    //    bottom gap              =  10
-    //                              ─────
-    //    total extra             = 778 px
-    h += 22 * 26 + 5 * 20 + 5 * 18 + 6 + 10;
+    if (isMidiExpanded)
+    {
+        // MIDI: 22 data rows + 5 sub-headers + 5 col-desc + gaps
+        h += 22 * 26 + 5 * 20 + 5 * 18 + 6 + 10;
+    }
+
+    if (isShortcutsExpanded)
+    {
+        // Shortcuts: SC_COUNT rows x 26 + 18 col-desc + 6 top gap +
+        //            8 gap + 28 reset button + 10 bottom gap
+        h += OrbitalLooperAudioProcessor::SC_COUNT * 26 + 18 + 6 + 8 + 28 + 10;
+    }
+
     return h;
 }
 
@@ -1548,6 +1792,11 @@ void SettingsComponent::refreshAllControls()
         }
         channelComboBoxes[i]->setSelectedId(mapping.channel, juce::dontSendNotification);
     }
+
+    // Shortcuts
+    cancelShortcutLearn();
+    for (int i = 0; i < OrbitalLooperAudioProcessor::SC_COUNT; ++i)
+        updateShortcutKeyLabel(i);
 }
 
 //==============================================================================

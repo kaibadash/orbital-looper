@@ -32,6 +32,7 @@ public:
     void resized() override;
     void timerCallback() override;
     void mouseDown(const juce::MouseEvent& e) override;
+    bool keyPressed(const juce::KeyPress& key) override;
 
 private:
     OrbitalLooperAudioProcessor& audioProcessor;
@@ -124,6 +125,21 @@ private:
     juce::Label      maxLayersLabel;
     juce::Label      maxLayersValueLabel;       // editable grey box
     juce::TextButton unlimitedLayersButton;     // ON/OFF toggle
+
+    //==========================================================================
+    // Section: SHORTCUTS (collapsible)
+    //==========================================================================
+    juce::Label      shortcutsSectionHeader;   // hit-test for expand/collapse
+    bool             isShortcutsExpanded = false;
+    juce::OwnedArray<juce::Label>      shortcutNameLabels;
+    juce::OwnedArray<juce::Label>      shortcutKeyLabels;     // shows key, also editable text
+    juce::OwnedArray<juce::TextButton> shortcutSetButtons;    // capture next keypress
+    juce::OwnedArray<juce::TextButton> shortcutClearButtons;  // clear binding
+    juce::TextButton                   resetShortcutsButton;  // restore all defaults
+    int              shortcutLearningIndex = -1;
+    void             updateShortcutKeyLabel(int i);
+    void             setShortcutRowsVisible(bool visible);
+    void             cancelShortcutLearn();
 
     //==========================================================================
     // Section: GLOBAL DEFAULTS
