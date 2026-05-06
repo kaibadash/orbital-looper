@@ -38,8 +38,7 @@ target_include_directories(OrbitalLooper
     PRIVATE
         Source
         Source/Core
-        Source/UI
-        JuceLibraryCode)
+        Source/UI)
 
 target_compile_definitions(OrbitalLooper
     PUBLIC
