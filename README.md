@@ -83,6 +83,19 @@ Copy the plugin to the appropriate system directory for your platform:
 
 *Note: AU format is macOS only. Windows and Linux use VST3.*
 
+**macOS quarantine workaround:** Plugins downloaded from GitHub Releases are tagged with macOS's quarantine attribute, which causes "Orbital Looper is damaged and can't be opened" even though the file is fine. After copying the plugin into place, strip the attribute once:
+
+```bash
+xattr -cr ~/Library/Audio/Plug-Ins/Components/Orbital\ Looper.component
+xattr -cr ~/Library/Audio/Plug-Ins/VST3/Orbital\ Looper.vst3
+```
+
+If the AU still shows "AUDIO UNIT ERROR" in your DAW, macOS is serving a cached validation failure from before the attribute was cleared. Reset the AU cache and restart the DAW:
+
+```bash
+killall -9 AudioComponentRegistrar
+```
+
 Rescan plugins in your DAW, then add Orbital Looper to an audio track.
 
 **AU Validation (macOS only):**
