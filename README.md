@@ -90,6 +90,12 @@ xattr -cr ~/Library/Audio/Plug-Ins/Components/Orbital\ Looper.component
 xattr -cr ~/Library/Audio/Plug-Ins/VST3/Orbital\ Looper.vst3
 ```
 
+If the AU still shows "AUDIO UNIT ERROR" in your DAW, macOS is serving a cached validation failure from before the attribute was cleared. Reset the AU cache and restart the DAW:
+
+```bash
+killall -9 AudioComponentRegistrar
+```
+
 Rescan plugins in your DAW, then add Orbital Looper to an audio track.
 
 **AU Validation (macOS only):**
