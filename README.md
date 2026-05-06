@@ -9,15 +9,19 @@ Built by [Planet Pluto Effects](https://planetplutolabs.github.io/planet-pluto-e
 ---
 
 ![Main UI](screenshots/01-main-ui.png)
+
 *Default view with transport controls, metronome, and loop card.*
 
 ![Recording](screenshots/04-recording.png)
+
 *Recording a loop with beat visualization and click track active.*
 
 ![Playing](screenshots/05-playing.png)
+
 *Loop playback with progress bar and layer indicator.*
 
 ![Overdubbing](screenshots/06-overdubbing.png)
+
 *Overdubbing a second layer onto an existing loop.*
 
 ---
@@ -389,16 +393,16 @@ The plugin automatically saves and restores its complete state (including audio)
 
 ## Building from Source
 
-Requires JUCE 7 and Xcode.
+Requires [JUCE 8](https://github.com/juce-framework/JUCE) and [Xcode](https://developer.apple.com/jp/xcode/).
 
 ```bash
 # Build AU
-xcodebuild -project "Builds/MacOSX/OrbitalLooper.xcodeproj" \
+xcodebuild -project "Builds/MacOSX/Orbital Looper.xcodeproj" \
   -scheme "Orbital Looper - AU" \
   -configuration Release build
 
 # Build VST3
-xcodebuild -project "Builds/MacOSX/OrbitalLooper.xcodeproj" \
+xcodebuild -project "Builds/MacOSX/Orbital Looper.xcodeproj" \
   -scheme "Orbital Looper - VST3" \
   -configuration Release build
 ```
