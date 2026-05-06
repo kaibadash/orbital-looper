@@ -267,6 +267,39 @@ public:
     void setDarkMode(bool dark)  { darkMode = dark; if (onThemeChanged) onThemeChanged(); }
     std::function<void()> onThemeChanged;
 
+    //==============================================================================
+    // KEYBOARD SHORTCUTS — top-bar buttons
+    //==============================================================================
+    enum ShortcutId
+    {
+        SC_THEME = 0,
+        SC_SAVE,
+        SC_LOAD,
+        SC_SETTINGS,
+        SC_RECORD,
+        SC_MULTIPLY,
+        SC_PLAY,
+        SC_RESTART,
+        SC_UNDO,
+        SC_REDO,
+        SC_CLEAR,
+        SC_LOOP_UP,
+        SC_LOOP_DOWN,
+        SC_LOOP_ALL,
+        SC_COUNT_IN,
+        SC_CLICK_TRACK,
+        SC_METRONOME,
+        SC_TAP,
+        SC_ADD_LOOP,
+        SC_COUNT
+    };
+
+    juce::KeyPress       getShortcut(int id) const;
+    void                 setShortcut(int id, const juce::KeyPress& kp);
+    static juce::KeyPress getDefaultShortcut(int id);
+    static const char*    getShortcutName(int id);
+    void                 resetShortcutsToDefaults();
+
 private:
     //==============================================================================
     // v02.00.01 - LOOP ENGINE VECTOR
@@ -361,6 +394,11 @@ private:
     // v07.00 - LIGHT/DARK THEME
     //==============================================================================
     bool darkMode = true;
+
+    //==============================================================================
+    // KEYBOARD SHORTCUTS
+    //==============================================================================
+    juce::KeyPress shortcuts[SC_COUNT];
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OrbitalLooperAudioProcessor)

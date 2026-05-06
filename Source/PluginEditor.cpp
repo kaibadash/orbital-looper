@@ -487,6 +487,7 @@ OrbitalLooperAudioProcessorEditor::OrbitalLooperAudioProcessorEditor(
     setLookAndFeel(&customLookAndFeel);
     setResizable(true, true);
     setResizeLimits(600, 300, 1536, 1200);
+    setWantsKeyboardFocus(true);   // enable keyboard shortcuts at editor level
     setSize(BASE_WIDTH, 390);  // temporary height; resized() will snap it
 
     // v06.00: Restore saved width
@@ -619,10 +620,8 @@ OrbitalLooperAudioProcessorEditor::OrbitalLooperAudioProcessorEditor(
     // FUNCTIONS BAR — Group 1: RECORD/OVERDUB
     //==========================================================================
     recordButton.setButtonText("REC/\nDUB");
-    recordButton.onStateChange = [this]
+    recordButton.onClick = [this]
     {
-        if (!recordButton.isDown()) return;
-
         // v04.00 — if count-in is enabled and any target loop would start a fresh
         // recording (Stopped → Recording), trigger the count-in first.
         if (audioProcessor.getCountInEnabled())
@@ -1505,6 +1504,57 @@ OrbitalLooperAudioProcessorEditor::~OrbitalLooperAudioProcessorEditor()
     audioProcessor.onThemeChanged      = nullptr;
     stopTimer();
     setLookAndFeel(nullptr);
+}
+
+//==============================================================================
+// KEYBOARD SHORTCUT DISPATCHER
+//==============================================================================
+bool OrbitalLooperAudioProcessorEditor::keyPressed(const juce::KeyPress& key)
+{
+    using P = OrbitalLooperAudioProcessor;
+
+    // Map a shortcut id to the button it should trigger.
+    auto buttonForId = [this](int id) -> juce::Button*
+    {
+        switch (id)
+        {
+            case P::SC_THEME:       return &themeToggleButton;
+            case P::SC_SAVE:        return &saveButton;
+            case P::SC_LOAD:        return &loadButton;
+            case P::SC_SETTINGS:    return &settingsButton;
+            case P::SC_RECORD:      return &recordButton;
+            case P::SC_MULTIPLY:    return &multiplyButton;
+            case P::SC_PLAY:        return &playButton;
+            case P::SC_RESTART:     return &restartButton;
+            case P::SC_UNDO:        return &undoButton;
+            case P::SC_REDO:        return &redoButton;
+            case P::SC_CLEAR:       return &clearButton;
+            case P::SC_LOOP_UP:     return &loopUpButton;
+            case P::SC_LOOP_DOWN:   return &loopDownButton;
+            case P::SC_LOOP_ALL:    return &loopAllButton;
+            case P::SC_COUNT_IN:    return &countInButton;
+            case P::SC_CLICK_TRACK: return &clickTrackButton;
+            case P::SC_METRONOME:   return &metronomeOnOffButton;
+            case P::SC_TAP:         return &tapButton;
+            case P::SC_ADD_LOOP:    return &addLoopButton;
+            default:                return nullptr;
+        }
+    };
+
+    for (int id = 0; id < P::SC_COUNT; ++id)
+    {
+        const auto bound = audioProcessor.getShortcut(id);
+        if (! bound.isValid()) continue;
+        if (! (bound == key))  continue;
+
+        if (auto* b = buttonForId(id))
+        {
+            if (b->isShowing() && b->isEnabled())
+                b->triggerClick();
+            return true;
+        }
+    }
+    return false;
 }
 
 //==============================================================================
